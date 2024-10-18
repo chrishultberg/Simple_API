@@ -227,7 +227,7 @@ function generateReport($pdo, $term_id, $date, $absent = false, $format = 'json'
 -   __Absent Students Report__:
     
     ```php    
-    https://mlc.ez-it-solutions.com/attendance/api.php?action=report&date=2024-08-21&absent=true&format=json&term_id=2
+    https://localhost/attendance/api.php?action=report&date=2024-08-21&absent=true&format=json&term_id=2
     ```
     
     This will return all students who do not have an attendance record on `2024-08-21` but are enrolled in courses ending in "MLC-0000-1" for the specified `term_id`.
@@ -235,7 +235,7 @@ function generateReport($pdo, $term_id, $date, $absent = false, $format = 'json'
 -   __Present Students Report (Attendance Report)__:
     
     ```php
-    https://mlc.ez-it-solutions.com/attendance/api.php?action=report&date=2024-08-21&absent=false&format=json&term_id=2
+    https://localhost/attendance/api.php?action=report&date=2024-08-21&absent=false&format=json&term_id=2
     ```
     
     This will return all students who have an attendance record on `2024-08-21` and are enrolled in courses ending in "MLC-0000-1" for the specified `term_id`.
