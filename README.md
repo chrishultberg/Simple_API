@@ -142,10 +142,74 @@ Here’s a step-by-step breakdown of how we build our query using logic to handl
 ### Code to Handle the Logic
 
 ```php
-<?php  function generateReport($pdo, $term_id, $date, $absent = false, $format = 'json') {     // Fetch courses for the specified term that end with "MLC-0000-1"     $query = "SELECT c.students               FROM courses c               JOIN terms t ON c.term = t.id               WHERE c.term = ? AND c.shortName LIKE '%MLC-0000-1'";                    $stmt = $pdo->prepare($query);     $stmt->execute([$term_id]);     $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);      if (empty($courses)) {         return json_encode(['status' => 'error', 'message' => 'No courses found for the specified term.']);     }      // Collect all students from the selected courses     $enrolledStudents = [];     foreach ($courses as $course) {         $students = json_decode($course['students'], true); // Decode the JSON student list         if ($students) {             $enrolledStudents = array_merge($enrolledStudents, $students);         }     }      // If no students are found, return an error     if (empty($enrolledStudents)) {         return json_encode(['status' => 'error', 'message' => 'No students found for the selected courses.']);     }      // Remove duplicate student IDs     $enrolledStudents = array_unique($enrolledStudents);      // Fetch attendance records for the specified date and term     $attendanceQuery = "SELECT a.student_id                         FROM attendance a                         WHERE a.date = ? AND a.term_id = ?";                              $attendanceStmt = $pdo->prepare($attendanceQuery);     $attendanceStmt->execute([$date, $term_id]);     $attendanceRecords = $attendanceStmt->fetchAll(PDO::FETCH_COLUMN);      // Compare enrolled students with attendance records     if ($absent) {         // Return students who are enrolled but do not have an attendance record for the specified date         $absentStudents = array_diff($enrolledStudents, $attendanceRecords);         $result = array_values($absentStudents);     } else {         // Return students who are enrolled and have an attendance record for the specified date         $presentStudents = array_intersect($enrolledStudents, $attendanceRecords);         $result = array_values($presentStudents);     }      // Return the report in the requested format (default is JSON)     if ($format == 'html') {         return generateHtmlReport($result, $date, $term_id, $absent);     } else if ($format == 'email') {         return sendEmailReport($pdo, generateHtmlReport($result, $date, $term_id, $absent));     } else {         return json_encode(['status' => 'success', 'data' => $result]);     } }  ?>
+<?php
+
+function generateReport($pdo, $term_id, $date, $absent = false, $format = 'json') {
+    // Fetch courses for the specified term that end with "MLC-0000-1"
+    $query = "SELECT c.students
+              FROM courses c
+              JOIN terms t ON c.term = t.id
+              WHERE c.term = ? AND c.shortName LIKE '%MLC-0000-1'";
+              
+    $stmt = $pdo->prepare($query);
+    $stmt->execute([$term_id]);
+    $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (empty($courses)) {
+        return json_encode(['status' => 'error', 'message' => 'No courses found for the specified term.']);
+    }
+
+    // Collect all students from the selected courses
+    $enrolledStudents = [];
+    foreach ($courses as $course) {
+        $students = json_decode($course['students'], true); // Decode the JSON student list
+        if ($students) {
+            $enrolledStudents = array_merge($enrolledStudents, $students);
+        }
+    }
+
+    // If no students are found, return an error
+    if (empty($enrolledStudents)) {
+        return json_encode(['status' => 'error', 'message' => 'No students found for the selected courses.']);
+    }
+
+    // Remove duplicate student IDs
+    $enrolledStudents = array_unique($enrolledStudents);
+
+    // Fetch attendance records for the specified date and term
+    $attendanceQuery = "SELECT a.student_id
+                        FROM attendance a
+                        WHERE a.date = ? AND a.term_id = ?";
+                        
+    $attendanceStmt = $pdo->prepare($attendanceQuery);
+    $attendanceStmt->execute([$date, $term_id]);
+    $attendanceRecords = $attendanceStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    // Compare enrolled students with attendance records
+    if ($absent) {
+        // Return students who are enrolled but do not have an attendance record for the specified date
+        $absentStudents = array_diff($enrolledStudents, $attendanceRecords);
+        $result = array_values($absentStudents);
+    } else {
+        // Return students who are enrolled and have an attendance record for the specified date
+        $presentStudents = array_intersect($enrolledStudents, $attendanceRecords);
+        $result = array_values($presentStudents);
+    }
+
+    // Return the report in the requested format (default is JSON)
+    if ($format == 'html') {
+        return generateHtmlReport($result, $date, $term_id, $absent);
+    } else if ($format == 'email') {
+        return sendEmailReport($pdo, generateHtmlReport($result, $date, $term_id, $absent));
+    } else {
+        return json_encode(['status' => 'success', 'data' => $result]);
+    }
+}
+
+?>
 ```
 
-### Explanation of Changes:
+### Explanation - How it Works:
 
 1.  __Fetch Courses with "MLC-0000-1"__: The query filters courses based on the `term_id` and course names ending with "MLC-0000-1" using the `LIKE` clause.
     
