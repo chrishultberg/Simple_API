@@ -144,12 +144,15 @@ Here’s a step-by-step breakdown of how we build our query using logic to handl
 ```php
 <?php
 
-function generateReport($pdo, $term_id, $date, $absent = false, $format = 'json') {
+function generateReport($pdo, $term_id, $student_id, $date, $absent, $format) {
+    // Ensure absent is a boolean; default to false if not explicitly true
+    $absent = isset($absent) ? filter_var($absent, FILTER_VALIDATE_BOOLEAN) : false;
+
     // Fetch courses for the specified term that end with "MLC-0000-1"
     $query = "SELECT c.students
               FROM courses c
               JOIN terms t ON c.term = t.id
-              WHERE c.term = ? AND c.shortName LIKE '%MLC-0000-1'";
+              WHERE c.term = ? AND c.courseID LIKE '%MLC-0000-1'";
               
     $stmt = $pdo->prepare($query);
     $stmt->execute([$term_id]);
@@ -189,20 +192,40 @@ function generateReport($pdo, $term_id, $date, $absent = false, $format = 'json'
     if ($absent) {
         // Return students who are enrolled but do not have an attendance record for the specified date
         $absentStudents = array_diff($enrolledStudents, $attendanceRecords);
-        $result = array_values($absentStudents);
+        $attendances = array_values($absentStudents);
     } else {
         // Return students who are enrolled and have an attendance record for the specified date
         $presentStudents = array_intersect($enrolledStudents, $attendanceRecords);
-        $result = array_values($presentStudents);
+        $attendances = array_values($presentStudents);
     }
 
-    // Return the report in the requested format (default is JSON)
-    if ($format == 'html') {
-        return generateHtmlReport($result, $date, $term_id, $absent);
-    } else if ($format == 'email') {
-        return sendEmailReport($pdo, generateHtmlReport($result, $date, $term_id, $absent));
-    } else {
-        return json_encode(['status' => 'success', 'data' => $result]);
+    try {
+        // Fetch term short_name if a term_id is provided
+        $termShortName = '';
+        if ($term_id) {
+            $termQuery = "SELECT short_name FROM terms WHERE id = ?";
+            $termStmt = $pdo->prepare($termQuery);
+            $termStmt->execute([$term_id]);
+            $term = $termStmt->fetch(PDO::FETCH_ASSOC);
+            $termShortName = $term['short_name'] ?? '';
+        }
+
+        // Format the report date
+        $formattedDate = ($date) ? (new DateTime($date))->format('m-d-Y') : 'Multiple Dates';
+
+        // Return the report in the requested format (default is JSON)
+        if ($format == 'html') {
+            $htmlReport = generateHtmlReport($pdo, $attendances, $formattedDate, $termShortName, $absent);
+            return $htmlReport; // Output HTML directly
+        } else if ($format == 'email') {
+            require_once 'sendEmail.php';
+            return sendEmailReport($pdo, generateHtmlReport($pdo, $attendances, $formattedDate, $termShortName, $absent)); // Pass $pdo here
+        } else {
+            return ['status' => 'success', 'data' => $attendances];
+        }
+
+    } catch (PDOException $e) {
+        return ['status' => 'error', 'message' => $e->getMessage()];
     }
 }
 
