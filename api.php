@@ -30,7 +30,20 @@ $action = strtolower(getParam('action', $requestMethod) ?? '');
 // Handle API actions
 switch ($action) {
 
-case 'report':
+    case 'backupdatabase':
+    
+        $result = getParams([], ['format'], $requestMethod);
+        if (empty($result['missing'])) {
+            include 'functions/Database.php';
+            $format = !empty($result['params']['format']) ? $result['params']['format'] : 'json';
+            $response = backupDatabase($pdo, $format);
+        } else {
+            $response = 'Missing parameters: ' . implode(', ', $result['missing']);
+        }
+        echo $response;
+        break;
+
+    case 'report':
 
         // getParams will use the first set of brackets as REQUIRED and the second set of brackets are optional parameters
         $result = getParams([], ['term_id', 'student_id', 'date', 'absent', 'format'], $requestMethod);
