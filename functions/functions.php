@@ -60,4 +60,71 @@ function getParams($requiredParams, $optionalParams, $requestMethod) {
     return ['params' => $params, 'missing' => $missingParams];
 }
 
+function assignLeader($pdo, $term_id) {
+    try {
+        // Step 1: Get all leaders for the provided term_id
+        $stmt = $pdo->prepare("
+            SELECT l.id AS leader_id 
+            FROM leaders l 
+            WHERE l.term_id = :term_id
+        ");
+        $stmt->execute(['term_id' => $term_id]);
+        $leaders = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+
+        if (empty($leaders)) {
+            // No leaders available for the term
+            echo json_encode(['status' => 'error', 'message' => 'No leaders found for term_id: ' . $term_id]);
+            return null;
+        }
+
+        // Step 2: Get the count of students assigned to each leader
+        $stmt = $pdo->prepare("
+            SELECT leader_id, COUNT(id) AS student_count
+            FROM students
+            WHERE term_id = :term_id AND leader_id IS NOT NULL
+            GROUP BY leader_id
+        ");
+        $stmt->execute(['term_id' => $term_id]);
+        $studentCounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Initialize an array to keep track of student counts per leader
+        $leaderStudentCount = array_fill_keys($leaders, 0);
+
+        // Populate the student counts for each leader
+        foreach ($studentCounts as $count) {
+            // Ensure only valid leader_id keys are used
+            if (!empty($count['leader_id'])) {
+                $leaderStudentCount[$count['leader_id']] = $count['student_count'];
+            }
+        }
+
+        // Debugging output for student counts
+        //echo json_encode(['status' => 'debug', 'message' => 'Leader Student Counts: ', 'data' => $leaderStudentCount]);
+
+        // Step 3: Find the leader with the least number of students, using lowest leader_id as a tiebreaker
+        $minCount = min($leaderStudentCount);
+
+        $bestLeaders = array_filter($leaderStudentCount, function($count) use ($minCount) {
+            return $count == $minCount;
+        });
+
+        if (empty($bestLeaders)) {
+            echo json_encode(['status' => 'error', 'message' => 'No valid leader found after filtering.']);
+            return null;
+        }
+
+        $bestLeaderId = min(array_keys($bestLeaders));
+
+        // Debugging output for the selected leader
+        //echo json_encode(['status' => 'debug', 'message' => 'Best Leader ID Selected: ' . $bestLeaderId]);
+
+        return $bestLeaderId;
+
+    } catch (PDOException $e) {
+        // Handle error appropriately
+        echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+        return null;
+    }
+}
+
 ?>
