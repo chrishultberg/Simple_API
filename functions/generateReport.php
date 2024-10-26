@@ -75,7 +75,7 @@ function generateReport($pdo, $term_id, $student_id, $date, $absent, $format) {
             return $htmlReport; // Output HTML directly
         } else if ($format == 'email') {
             require_once 'sendEmail.php';
-            return sendEmailReport($pdo, generateHtmlReport($pdo, $attendances, $formattedDate, $termShortName, $absent)); // Pass $pdo here
+            return sendEmailReport($pdo, generateHtmlReport($pdo, $attendances, $formattedDate, $termShortName, $absent), $absent);
         } else {
             return ['status' => 'success', 'data' => $attendances];
         }
